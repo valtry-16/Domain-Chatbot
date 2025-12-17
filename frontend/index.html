@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Local AI</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+::selection { background: transparent; }
+pre::selection, code::selection { background: transparent; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #343541;
+  color: #ececf1;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+.app {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 14px 20px;
+  border-bottom: 1px solid #565869;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.domains {
+  display: flex;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #565869;
+}
+
+.domain-btn {
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: #40414f;
+  border: none;
+  color: #ececf1;
+  cursor: pointer;
+}
+
+.domain-btn.active {
+  background: #19c37d;
+  color: #000;
+}
+
+.suggestions {
+  padding: 10px 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.suggestion {
+  background: #40414f;
+  padding: 6px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.messages::-webkit-scrollbar { display: none; }
+
+.msg {
+  max-width: 85%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.math-block {
+  background: #2f3140;
+  padding: 14px;
+  border-radius: 8px;
+  margin: 12px 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.katex {
+  font-size: 1.15em;
+}
+
+.user {
+  background: #19c37d;
+  color: #000;
+  margin-left: auto;
+}
+
+.bot {
+  background: #444654;
+}
+
+.thinking {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.cursor {
+  display: inline-block;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.timing {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+/* ✅ FIXED CODE BLOCK */
+pre {
+  background: #202123;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+pre code {
+  display: block;
+  white-space: pre-wrap;   /* ✅ FIX */
+  word-break: break-word;  /* ✅ FIX */
+  font-size: 13px;
+}
+
+.input-box {
+  border-top: 1px solid #565869;
+  padding: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #40414f;
+  color: #ececf1;
+}
+
+button.send {
+  background: #19c37d;
+  border: none;
+  padding: 0 20px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+<div class="header">Local AI</div>
+
+<div class="domains">
+  <button class="domain-btn active" onclick="setDomain('chat', this)">Chat</button>
+  <button class="domain-btn" onclick="setDomain('coding', this)">Coding</button>
+  <button class="domain-btn" onclick="setDomain('exam', this)">Exam</button>
+</div>
+
+<div class="suggestions" id="suggestions"></div>
+<div class="messages" id="messages"></div>
+
+<div class="input-box">
+  <input id="input" placeholder="Send a message…" />
+  <button class="send" onclick="send()">Send</button>
+</div>
+</div>
+
+<script>
+let domain = "chat";
+let currentController = null;
+
+const showSuggestions = {
+  chat: true,
+  coding: true,
+  exam: true
+};
+
+const chatHistory = { chat: [], coding: [], exam: [] };
+
+const suggestionsMap = {
+  chat: [
+    "Explain artificial intelligence like I’m 10 years old",
+    "Difference between AI and machine learning",
+    "Can you explain a hard topic in a funny way?",
+    "If you were human for a day, what would you do?",
+    "How does the internet actually work behind the scenes?"
+  ],
+  coding: [
+    "Write a C program to add two numbers",
+    "Write a Python program for prime numbers",
+    "Write a Python program to reverse a string",
+    "Write a Java program to multiply two numbers",
+    "Write a HTML program for creating a portfolio website"
+  ],
+  exam: [
+    "What is Kirchhoff’s voltage law?",
+    "Explain Ohm’s law with formula",
+    "Define superposition theorem",
+    "Explain types of semiconductor materials",
+    "Write short notes on MOSFET with advantages and applications"
+  ]
+};
+
+const messages = document.getElementById("messages");
+const input = document.getElementById("input");
+const suggestionsDiv = document.getElementById("suggestions");
+
+function setDomain(d, btn) {
+  if (currentController) currentController.abort();
+  domain = d;
+  document.querySelectorAll(".domain-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderSuggestions();
+  renderMessages();
+}
+
+function renderSuggestions() {
+  if (!showSuggestions[domain]) {
+    suggestionsDiv.style.display = "none";
+    return;
+  }
+
+  suggestionsDiv.style.display = "flex";
+  suggestionsDiv.innerHTML = "";
+
+  suggestionsMap[domain].forEach(t => {
+    const s = document.createElement("div");
+    s.className = "suggestion";
+    s.innerText = t;
+    s.onclick = () => input.value = t;
+    suggestionsDiv.appendChild(s);
+  });
+}
+
+renderSuggestions();
+
+function renderMessages() {
+  messages.innerHTML = "";
+  chatHistory[domain].forEach(m => {
+    const div = document.createElement("div");
+    div.className = "msg " + m.cls;
+    div.innerHTML = m.html;
+    messages.appendChild(div);
+  });
+
+  messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" });
+
+}
+
+function escapeHTML(str) {
+  return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function formatText(text) {
+  return text.replace(/\n/g, "<br>");
+}
+
+function formatCode(text) {
+  return `<pre><code>${escapeHTML(text.trim())}</code></pre>`;
+}
+
+function normalizeMath(text) {
+  return text.replace(/\*\*(.+?)\*\*/gs, (_, content) => {
+    const expr = content.trim();
+
+    // math symbols to detect formula
+    const isMath = /[=+\-*/^]/.test(expr);
+
+    if (isMath) {
+      // convert to KaTeX internally
+      return `$$${expr}$$`;
+    }
+
+    // not math → normal bold text (remove **)
+    return `<strong>${expr}</strong>`;
+  });
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+
+  chatHistory[domain].push({ html: text, cls: "user" });
+  showSuggestions[domain] = false;
+  renderSuggestions();
+
+  const thinking = { html: "Thinking…", cls: "bot thinking" };
+  chatHistory[domain].push(thinking);
+  renderMessages();
+
+  const responseMsg = { html: "", cls: "bot" };
+  chatHistory[domain].push(responseMsg);
+
+  let raw = "";
+  let first = true;
+  const start = Date.now();
+
+  currentController = new AbortController();
+
+  try {
+    const res = await fetch("http://127.0.0.1:8000/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain, message: text }),
+      signal: currentController.signal
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      if (first) {
+        chatHistory[domain] = chatHistory[domain].filter(m => m !== thinking);
+        first = false;
+      }
+
+      raw += decoder.decode(value);
+     
+      let liveText = raw;
+
+      if (domain === "exam") {
+        liveText = normalizeMath(liveText);
+      }
+
+      responseMsg.html =
+        domain === "coding"
+          ? formatCode(raw)
+          : formatText(liveText) + `<span class="cursor">▍</span>`;
+
+      renderMessages();
+    }
+
+    const time = Math.floor((Date.now() - start) / 1000);
+
+    let finalText = raw;
+
+    if (domain === "exam") {
+      finalText = normalizeMath(finalText);
+    }
+
+    responseMsg.html = `
+      <div class="timing">⏱ Took ${time}s</div>
+      ${domain === "coding" ? formatCode(raw) : formatText(finalText)}
+    `;
+
+    renderMessages();
+
+    if (domain === "exam") {
+      setTimeout(() => {
+        renderMathInElement(messages, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false }
+          ],
+          throwOnError: false
+        });
+    
+    // Wrap block formulas visually (not code)
+    document.querySelectorAll(".katex-display").forEach(el => {
+      if (!el.parentElement.classList.contains("math-block")) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "math-block";
+        el.parentNode.insertBefore(wrapper, el);
+        wrapper.appendChild(el);
+          }
+        });
+
+      }, 0);
+  }
+
+    
+    if (domain === "coding") {
+      setTimeout(() => {
+         document.querySelectorAll("pre code").forEach(block => {
+           hljs.highlightElement(block);
+         });
+       }, 0);
+     }
+
+  } catch (e) {
+    console.error(e);
+  }
+
+  currentController = null;
+}
+</script>
+</body>
+</html>

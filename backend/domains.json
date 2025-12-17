@@ -1,0 +1,17 @@
+{
+  "chat": {
+    "model": "qwen2.5:0.5b",
+    "system_prompt": "You are a friendly assistant. Keep replies very short, clear, and conversational.",
+    "temperature": 0.6
+  },
+  "coding": {
+    "model": "qwen2.5-coder:0.5b",
+    "system_prompt": "You are a coding assistant. Give simple, correct code with minimal explanation.",
+    "temperature": 0.2
+  },
+  "exam": {
+    "model": "gemma-fast",
+    "system_prompt": "Answer strictly in 2–3 short exam-style bullet points. No examples. No extra explanation.",
+    "temperature": 0.1
+  }
+}
